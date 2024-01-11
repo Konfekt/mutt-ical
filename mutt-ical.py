@@ -5,41 +5,47 @@ This script is meant as a simple way to reply to ical invitations from mutt.
 See README for instructions and LICENSE for licensing information.
 """
 
-__author__="Martin Sander"
-__license__="MIT"
+__author__ = "Martin Sander"
+__license__ = "MIT"
 
-import vobject
-import tempfile, time
-import os, sys
-import warnings
-from datetime import datetime
+import locale
 import subprocess
+import sys
+import time
+from datetime import datetime
+from email.message import EmailMessage
 from getopt import gnu_getopt as getopt
 
-from email.message import EmailMessage
+import vobject
 
-usage="""
+usage = """
 usage:
 %s [OPTIONS] -e your@email.address filename.ics
 OPTIONS:
     -i interactive
     -a accept
     -d decline
-    -t tentatively accept
-    (accept is default, last one wins)
+    -t tentatively accept (accept is default, last one wins)
     -D display only
+    -s <sendmail command>
 """ % sys.argv[0]
+
 
 def del_if_present(dic, key):
     if key in dic:
         del dic[key]
 
+
 def set_accept_state(attendees, state):
     for attendee in attendees:
         attendee.params['PARTSTAT'] = [state]
-        for i in ["RSVP","ROLE","X-NUM-GUESTS","CUTYPE"]:
-            del_if_present(attendee.params,i)
+        for i in ["RSVP", "ROLE", "X-NUM-GUESTS", "CUTYPE"]:
+            # del_if_present(attendee.params, i)
+            def del_if_present(dic: dict, key: str) -> None:
+                if key in dic:
+                    del dic[key]
     return attendees
+
 
 def get_accept_decline():
     while True:
@@ -47,13 +53,14 @@ def get_accept_decline():
         ans = sys.stdin.readline()
         if ans.lower() == 'y\n' or ans == '\n':
             return 'ACCEPTED'
-        elif ans.lower() == 'n\n':
+        if ans.lower() == 'n\n':
             return 'DECLINED'
-        elif ans.lower() =='t\n':
+        if ans.lower() == 't\n':
             return 'TENTATIVE'
-        elif ans.lower() =='c\n':
+        if ans.lower() == 'c\n':
             print("aborted")
             sys.exit(1)
+
 
 def get_answer(invitation):
     # create
@@ -69,14 +76,17 @@ def get_answer(invitation):
 
     # new timestamp
     ans.vevent.add('dtstamp')
-    ans.vevent.dtstamp.value = datetime.utcnow().replace(
-            tzinfo = invitation.vevent.dtstamp.value.tzinfo)
+    # ans.vevent.dtstamp.value = datetime.utcnow().replace(
+    #         tzinfo=invitation.vevent.dtstamp.value.tzinfo)
+    ans.vevent.dtstamp.value = datetime.now(tz=invitation.vevent.dtstamp.value.tzinfo)
     return ans
+
 
 def execute(command, mailtext):
     process = subprocess.Popen(command, stdin=subprocess.PIPE)
-    process.stdin.write(mailtext)
-    process.stdin.close()
+    if process.stdin is not None:
+        process.stdin.write(mailtext)
+        process.stdin.close()
 
     result = None
     while result is None:
@@ -87,54 +97,50 @@ def execute(command, mailtext):
                 exit code %d\nPress return to continue" % result)
         sys.stdin.readline()
 
-def openics(invitation_file):
-    with open(invitation_file) as f:
-        invitation = vobject.readOne(f, ignoreUnreadable=True)
-    return invitation
 
-def format_date(value):
+def openics(invitation_file):
+    with open(invitation_file, encoding=locale.getpreferredencoding(False)) as f:
+        return vobject.readOne(f, ignoreUnreadable=True)
+
+
+def format_date(value: datetime) -> str:
     if isinstance(value, datetime):
         return value.astimezone(tz=None).strftime("%Y-%m-%d %H:%M %z")
-    else:
-        return value.strftime("%Y-%m-%d %H:%M %z")
+    return value.strftime("%Y-%m-%d %H:%M %z")
+
 
 def display(ical):
     summary = ical.vevent.contents['summary'][0].value
     if 'organizer' in ical.vevent.contents:
-        if hasattr(ical.vevent.organizer,'EMAIL_param'):
+        if hasattr(ical.vevent.organizer, 'EMAIL_param'):
             sender = ical.vevent.organizer.EMAIL_param
         else:
-            sender = ical.vevent.organizer.value.split(':')[1] #workaround for MS
+            sender = ical.vevent.organizer.value.split(':')[1]  # workaround for MS
     else:
         sender = "NO SENDER"
     if 'description' in ical.vevent.contents:
         description = ical.vevent.contents['description'][0].value
     else:
         description = "NO DESCRIPTION"
-    if 'attendee' in ical.vevent.contents:
-        attendees = ical.vevent.contents['attendee']
-    else:
-        attendees = ""
-    if 'location' in ical.vevent.contents:
-        locations = ical.vevent.contents['location']
-    else:
-        locations = None
+    attendees = ical.vevent.contents.get("attendee", "")
+    locations = ical.vevent.contents.get("location", None)
     sys.stdout.write("From:\t" + sender + "\n")
     sys.stdout.write("Title:\t" + summary + "\n")
     sys.stdout.write("To:\t")
     for attendee in attendees:
-        if hasattr(attendee,'EMAIL_param') and hasattr(attendee,'CN_param'):
+        if hasattr(attendee, 'EMAIL_param') and hasattr(attendee, 'CN_param'):
             sys.stdout.write(attendee.CN_param + " <" + attendee.EMAIL_param + ">, ")
         else:
             try:
-                sys.stdout.write(attendee.CN_param + " <" + attendee.value.split(':')[1] + ">, ") #workaround for MS
-            except:
-                sys.stdout.write(attendee.value.split(':')[1] + " <" + attendee.value.split(':')[1] + ">, ") #workaround for 'mailto:' in email
+                sys.stdout.write(attendee.CN_param + " <" + attendee.value.split(':')[1] + ">, ")  # workaround for MS
+            except Exception as e:
+                # workaround for 'mailto:' in email
+                sys.stdout.write(attendee.value.split(':')[1] + " <" + attendee.value.split(':')[1] + ">, ") 
     sys.stdout.write("\n")
     if hasattr(ical.vevent, 'dtstart'):
-        print("Start:\t%s" % (format_date(ical.vevent.dtstart.value),))
+        print(f"Start:\t{format_date(ical.vevent.dtstart.value)}")
     if hasattr(ical.vevent, 'dtend'):
-        print("End:\t%s" % (format_date(ical.vevent.dtend.value),))
+        print(f"End:\t{format_date(ical.vevent.dtend.value)}")
     if locations:
         sys.stdout.write("Location:\t")
         for location in locations:
@@ -144,23 +150,25 @@ def display(ical):
     sys.stdout.write("\n")
     sys.stdout.write(description + "\n")
 
-def sendmail():
+
+def sendmail_command():
     mutt_setting = subprocess.check_output(["mutt", "-Q", "sendmail"])
-    return mutt_setting.strip().decode().split("=")[1].replace('"', '').split()
+    return mutt_setting.strip().decode().split('sendmail=')[1].replace('"', '').split()
+
 
 def organizer(ical):
     if 'organizer' in ical.vevent.contents:
-        if hasattr(ical.vevent.organizer,'EMAIL_param'):
+        if hasattr(ical.vevent.organizer, 'EMAIL_param'):
             return ical.vevent.organizer.EMAIL_param
-        else:
-            return ical.vevent.organizer.value.split(':')[1] #workaround for MS
-    else:
-        raise("no organizer in event")
+        return ical.vevent.organizer.value.split(':')[1]  # workaround for MS
+    raise Exception("no organizer in event")
 
-if __name__=="__main__":
+
+if __name__ == "__main__":
+    sendmail = sendmail_command  # Set sendmail to the function that returns the command
     email_address = None
     accept_decline = 'ACCEPTED'
-    opts, args=getopt(sys.argv[1:],"e:aidtD")
+    opts, args = getopt(sys.argv[1:], "s:e:aidtD")
 
     if len(args) < 1:
         sys.stderr.write(usage)
@@ -169,9 +177,12 @@ if __name__=="__main__":
     invitation = openics(args[0])
     display(invitation)
 
-    for opt,arg in opts:
+    for opt, arg in opts:
         if opt == '-D':
             sys.exit(0)
+        if opt == '-s':
+            # If -s is provided, override sendmail with a lambda that returns the command
+            sendmail = lambda: arg.split() 
         if opt == '-e':
             email_address = arg
         if opt == '-i':
@@ -185,40 +196,54 @@ if __name__=="__main__":
 
     ans = get_answer(invitation)
 
-    if 'attendee' in invitation.vevent.contents:
-        attendees = invitation.vevent.contents['attendee']
-    else:
-        attendees = ""
-    set_accept_state(attendees,accept_decline)
+    attendees = invitation.vevent.contents.get("attendee", "")
+    set_accept_state(attendees, accept_decline)
     ans.vevent.add('attendee')
     ans.vevent.attendee_list.pop()
     flag = 1
     for attendee in attendees:
-        if hasattr(attendee,'EMAIL_param'):
+        if hasattr(attendee, 'EMAIL_param'):
             if attendee.EMAIL_param == email_address:
                 ans.vevent.attendee_list.append(attendee)
                 flag = 0
-        else:
-            if attendee.value.split(':')[1] == email_address:
-                ans.vevent.attendee_list.append(attendee)
-                flag = 0
+        elif attendee.value.split(':')[1] == email_address:
+            ans.vevent.attendee_list.append(attendee)
+            flag = 0
     if flag:
         sys.stderr.write("Seems like you have not been invited to this event!\n")
         sys.exit(1)
 
     summary = ans.vevent.contents['summary'][0].value
     accept_decline = accept_decline.capitalize()
-    subject = "'%s: %s'" % (accept_decline, summary)
+    subject = f"'{accept_decline}: {summary}'"
     to = organizer(ans)
 
     message = EmailMessage()
     message['From'] = email_address
     message['To'] = to
     message['Subject'] = subject
-    mailtext = "'%s has %s'" % (email_address, accept_decline.lower())
+    mailtext = f"{email_address} has {accept_decline.lower()}"
     message.add_alternative(mailtext, subtype='plain')
     message.add_alternative(ans.serialize(),
             subtype='calendar',
-            params={ 'method': 'REPLY' })
+            params={'method': 'REPLY'})
 
-    execute(sendmail() + ['--', to], message.as_bytes())
+    # Assuming sendmail is either a function that returns the sendmail command or the command itself
+    sendmail_command = sendmail() if callable(sendmail) else sendmail
+    subprocess.run([*sendmail_command, "--", to], input=message.as_bytes(), check=True)
+
+    # # From https://github.com/marvinthepa/mutt-ical/commit/c62488fbfa6a817e0f03f808c8cc14d771ce3c2d#diff-3248d42797b254937d2a6b11a3980df7c90a128ba41931a0dc8f4c1ed2c51d13R224
+    # if accept_decline in {'ACCEPTED', 'TENTATIVE'}:
+    #     # add to khal
+    #     khal = {}
+    #     khal['dtstart'] = None
+    #     khal['dtend'] = None
+    #     khal['summary'] = invitation.vevent.contents['summary'][0].value
+    #     if hasattr(invitation.vevent, 'dtstart'):
+    #         khal['dtstart'] = invitation.vevent.dtstart.value.astimezone(tz=None).strftime("%Y-%m-%d %H:%M")
+    #     if hasattr(invitation.vevent, 'dtend'):
+    #         khal['dtend'] = invitation.vevent.dtend.value.astimezone(tz=None).strftime("%Y-%m-%d %H:%M")
+    #     if 'description' in invitation.vevent.contents:
+    #         khal['summary'] += " :: "
+    #         khal['summary'] += invitation.vevent.contents['description'][0].value
+    #     execute(['khal', 'new', khal['dtstart'], khal['dtend'], khal['summary']], None)
