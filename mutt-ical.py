@@ -215,14 +215,22 @@ if __name__ == "__main__":
 
     summary = ans.vevent.contents['summary'][0].value
     accept_decline = accept_decline.capitalize()
-    subject = f"'{accept_decline}: {summary}'"
+    subject = f"{accept_decline}: {summary}"
     to = organizer(ans)
 
     message = EmailMessage()
     message['From'] = email_address
     message['To'] = to
     message['Subject'] = subject
-    mailtext = f"{email_address} has {accept_decline.lower()}"
+    if accept_decline.lower() == "accepted":
+        mailtext = f"Thank you for the invitation. I, {email_address}, will be attending."
+    elif accept_decline.lower() == "tentative":
+        mailtext = f"Thank you for the invitation. I, {email_address}, am tentatively available and have marked this time on my calendar."
+    elif accept_decline.lower() == "declined":
+        mailtext = f"Thank you for the invitation. Unfortunately, I, {email_address}, will not be able to attend."
+    else:
+        mailtext = "Invalid response type provided."
+
     message.add_alternative(mailtext, subtype='plain')
     message.add_alternative(ans.serialize(),
             subtype='calendar',
