@@ -28,12 +28,12 @@ alternative_order text/calendar text/x-vcalendar application/ics text/plain text
 
 Here the second line ensures that the calendar entry is displayed before the message text.
 
-- To reply to a calendar entry by pressing `r` in the attachment view (usually opened by hitting `v` after having selected a mail in mutt), add to your .muttrc a line such as
+- To answer a calendar entry by pressing `a` in the attachment view (usually opened by hitting `v` after having selected a mail in mutt), add to your .muttrc a line such as
 
 ```muttrc
-macro attach r \
+macro attach a \
     "<pipe-entry>iconv -c --to-code=UTF-8 > ~/.cache/mutt.ics<enter><shell-escape>~/bin/mutt-ical.py -i -e your.email@address -s 'msmtp --account=work' ~/.cache/mutt.ics<enter>" \
-    "reply to appointment request"
+    "answer appointment request"
 ```
 
 Here you need to customize the email address `your.email@address` and the send command `msmtp --account=work`.
@@ -42,7 +42,7 @@ If `-s` is not set, the Mutt setting `$sendmail` will be used.
 - To optionally open the Icalendar in your favorite desktop calendar application, such as `Ical`, run `xdg-open ~/.cache/mutt.ics` (on Linux, respectively `open ~/.cache/mutt.ics` on Mac OS) after the `mutt-ical.py` command, for example
 
 ```muttrc
-macro attach r \
+macro attach a \
     "<pipe-entry>iconv -c --to-code=UTF-8 > ~/.cache/mutt.ics<enter><shell-escape>~/bin/mutt-ical.py -i -e your.email@address -s 'msmtp --account=work' ~/.cache/mutt.ics && xdg-open ~/.cache/mutt.ics<enter>" \
     "reply to appointment request"
 ```
@@ -54,12 +54,12 @@ Usage
 If you configure auto_view (as above), then the description should be visible in
 the pager.
 (Otherwise view the attachements (usually by hitting 'v'), select and open the `Icalendar` entry.)
-To reply, just open the `Icalendar` file from mutt:
+To answer, just open the `Icalendar` file from mutt:
 
 * View the attachements (usually 'v')
 * Select the text/calendar entry
-* Hit 'r'
-* Choose your reply
+* Hit 'a'
+* Choose your answer
 
 
 Documentation
@@ -69,11 +69,11 @@ The script supports the following options: `-i`, `-a`, `-d`, `-t`, `-D`, and `-s
 If the `-D` option is used, the script will display the event details and terminate without sending any replies.
 The `-i`, `-a`, `-d`, and `-t` options are mutually exclusive;
 the last one specified determines the response type sent.
-By default, the script will use Mutt's sendmail setting to send the reply, unless the `-s` option is used to override it.
+By default, the script will use Mutt's sendmail setting to send the answer, unless the `-s` option is used to override it.
 
 ```sh
 -e <your.email@address>
-    Specify the email address to send the reply from. This should be the email address that received the invitation.
+    Specify the email address to send the answer from. This should be the email address that received the invitation.
 
 -i
     Interactive mode. Prompt for user input to accept, decline, or tentatively accept the invitation.
@@ -88,7 +88,7 @@ By default, the script will use Mutt's sendmail setting to send the reply, unles
     Tentatively accept the invitation automatically without prompting.
 
 -D
-    Display only. Show the event details but do not send any reply.
+    Display only. Show the event details but do not send any answer.
 
 -s <sendmail command>
     Specify the sendmail command to use for sending the email. If not set, the default Mutt setting will be used.
