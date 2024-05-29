@@ -203,10 +203,10 @@ if __name__ == "__main__":
     flag = 1
     for attendee in attendees:
         if hasattr(attendee, 'EMAIL_param'):
-            if attendee.EMAIL_param == email_address:
+            if attendee.EMAIL_param.lower() == email_address.lower():
                 ans.vevent.attendee_list.append(attendee)
                 flag = 0
-        elif attendee.value.split(':')[1] == email_address:
+        elif attendee.value.split(':')[1].lower() == email_address.lower():
             ans.vevent.attendee_list.append(attendee)
             flag = 0
     if flag:
