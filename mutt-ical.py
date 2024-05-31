@@ -218,18 +218,32 @@ if __name__ == "__main__":
     subject = f"{accept_decline}: {summary}"
     to = organizer(ans)
 
+    ans.vevent.add('priority')
+    ans.vevent.priority.value = '5'
+
     message = EmailMessage()
     message['From'] = email_address
     message['To'] = to
     message['Subject'] = subject
     if accept_decline.lower() == "accepted":
         mailtext = f"Thank you for the invitation. I, {email_address}, will be attending."
+
+        ans.vevent.add('status')
+        ans.vevent.status.value = 'CONFIRMED'
+        ans.vevent.add('x-microsoft-cdo-busystatus')
+        ans.vevent.x_microsoft_cdo_busystatus.value = 'BUSY'
     elif accept_decline.lower() == "tentative":
         mailtext = f"Thank you for the invitation. I, {email_address}, am tentatively available and have marked this time on my calendar."
+
+        ans.vevent.add('status')
+        ans.vevent.status.value = 'TENTATIVE'
+        ans.vevent.add('x-microsoft-cdo-busystatus')
+        ans.vevent.x_microsoft_cdo_busystatus.value = 'TENTATIVE'
     elif accept_decline.lower() == "declined":
         mailtext = f"Thank you for the invitation. Unfortunately, I, {email_address}, will not be able to attend."
     else:
         mailtext = "Invalid response type provided."
+
 
     message.add_alternative(mailtext, subtype='plain')
     message.add_alternative(ans.serialize(),
