@@ -1,5 +1,5 @@
 This single-file Python script `mutt-ical.py` displays and replies to [Icalendar](https://tools.ietf.org/html/rfc5545) invitations (.ics files) from mutt.
-It requires Mutt, Bash and Python with the [Vobject](https://github.com/py-vobject/vobject) Python package which can be installed with `pip install --user vobject`.
+It requires Mutt and Python with the [Vobject](https://github.com/py-vobject/vobject) Python package that can be installed with `pip install --user git+https://github.com/py-vobject/vobject`.
 
 Installing
 ----------
