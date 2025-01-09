@@ -155,22 +155,25 @@ def display(ical):
 
 def sendmail_command():
     try:
-        mutt_setting = subprocess.check_output(["mutt", "-Q", "sendmail"], stderr=subprocess.STDOUT)
-        sendmail_path = mutt_setting.strip().decode().split('sendmail=')[1].replace('"', '').split()
-        if sendmail_path:
-            return sendmail_path
+        # Try with 'mutt' first
+        output = subprocess.check_output(["mutt", "-Q", "sendmail"], stderr=subprocess.STDOUT)
+        output = output.strip().decode()
     except (subprocess.CalledProcessError, FileNotFoundError):
-        # Fallback to neomutt
         try:
-            neomutt_setting = subprocess.check_output(["neomutt", "-Q", "sendmail"], stderr=subprocess.STDOUT)
-            sendmail_path = neomutt_setting.strip().decode().split('sendmail=')[1].replace('"', '').split()
-            if sendmail_path:
-                return sendmail_path
+            # Fallback to 'neomutt' if 'mutt' fails
+            output = subprocess.check_output(["neomutt", "-Q", "sendmail"], stderr=subprocess.STDOUT)
+            output = output.strip().decode()
         except (subprocess.CalledProcessError, FileNotFoundError):
-            pass  # Neither mutt nor neomutt found or configured
+            # Neither 'mutt' nor 'neomutt' is available
+            return None
 
-    return None
-
+    # Use regex to find the sendmail setting
+    match = re.search(r'set\s+sendmail\s*=\s*"([^"]+)"', output)
+    if match:
+        sendmail_command = match.group(1).split()
+        return sendmail_command
+    else:
+        return None
 
 def organizer(ical):
     if 'organizer' in ical.vevent.contents:
