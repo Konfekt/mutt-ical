@@ -151,9 +151,25 @@ def display(ical):
     sys.stdout.write(description + "\n")
 
 
+    import subprocess
+
 def sendmail_command():
-    mutt_setting = subprocess.check_output(["mutt", "-Q", "sendmail"])
-    return mutt_setting.strip().decode().split('sendmail=')[1].replace('"', '').split()
+    try:
+        mutt_setting = subprocess.check_output(["mutt", "-Q", "sendmail"], stderr=subprocess.STDOUT)
+        sendmail_path = mutt_setting.strip().decode().split('sendmail=')[1].replace('"', '').split()
+        if sendmail_path:
+            return sendmail_path
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        # Fallback to neomutt
+        try:
+            neomutt_setting = subprocess.check_output(["neomutt", "-Q", "sendmail"], stderr=subprocess.STDOUT)
+            sendmail_path = neomutt_setting.strip().decode().split('sendmail=')[1].replace('"', '').split()
+            if sendmail_path:
+                return sendmail_path
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            pass  # Neither mutt nor neomutt found or configured
+
+    return None
 
 
 def organizer(ical):
@@ -252,6 +268,10 @@ if __name__ == "__main__":
 
     # Assuming sendmail is either a function that returns the sendmail command or the command itself
     sendmail_command = sendmail() if callable(sendmail) else sendmail
+
+    if not sendmail_command:
+    raise RuntimeError("Sendmail command is not configured. Aborting.")
+
     subprocess.run([*sendmail_command, "--", to], input=message.as_bytes(), check=True)
 
     # # From https://github.com/marvinthepa/mutt-ical/commit/c62488fbfa6a817e0f03f808c8cc14d771ce3c2d#diff-3248d42797b254937d2a6b11a3980df7c90a128ba41931a0dc8f4c1ed2c51d13R224
