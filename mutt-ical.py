@@ -151,10 +151,29 @@ def display(ical):
     sys.stdout.write(description + "\n")
 
 
-def sendmail_command():
-    mutt_setting = subprocess.check_output(["mutt", "-Q", "sendmail"])
-    return mutt_setting.strip().decode().split('sendmail=')[1].replace('"', '').split()
+    import subprocess
 
+def sendmail_command():
+    try:
+        # Try with 'mutt' first
+        output = subprocess.check_output(["mutt", "-Q", "sendmail"], stderr=subprocess.STDOUT)
+        output = output.strip().decode()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        try:
+            # Fallback to 'neomutt' if 'mutt' fails
+            output = subprocess.check_output(["neomutt", "-Q", "sendmail"], stderr=subprocess.STDOUT)
+            output = output.strip().decode()
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            # Neither 'mutt' nor 'neomutt' is available
+            return None
+
+    # Use regex to find the sendmail setting
+    match = re.search(r'set\s+sendmail\s*=\s*"([^"]+)"', output)
+    if match:
+        sendmail_command = match.group(1).split()
+        return sendmail_command
+    else:
+        return None
 
 def organizer(ical):
     if 'organizer' in ical.vevent.contents:
@@ -252,6 +271,10 @@ if __name__ == "__main__":
 
     # Assuming sendmail is either a function that returns the sendmail command or the command itself
     sendmail_command = sendmail() if callable(sendmail) else sendmail
+
+    if not sendmail_command:
+    raise RuntimeError("Sendmail command is not configured. Aborting.")
+
     subprocess.run([*sendmail_command, "--", to], input=message.as_bytes(), check=True)
 
     # # From https://github.com/marvinthepa/mutt-ical/commit/c62488fbfa6a817e0f03f808c8cc14d771ce3c2d#diff-3248d42797b254937d2a6b11a3980df7c90a128ba41931a0dc8f4c1ed2c51d13R224
